@@ -16,6 +16,7 @@ import os
 import sys
 import json
 import html
+import hashlib
 import datetime
 import subprocess
 import urllib.request
@@ -511,15 +512,85 @@ def build_stamp_print_html(challenge_tasks, prov):
 
 
 # ============================================================
+# ポスターの色とアイコン（タスク名から決まる。並び順には依存しない）
+# ============================================================
+POSTER_COLORS = ["c1", "c2", "c3", "c4", "c5", "c6"]
+
+# タスク名に含まれる語からアイコンを選ぶ。上から順に判定し、最初に一致したものを使う。
+# 「テーブルをふく」と「服」のようにかなが重なる語があるため、具体的な語を先に置くこと。
+ICON_RULES = [
+    (("くつした", "靴下", "くつ下"), "🧦"),
+    (("くつ", "靴", "げんかん", "玄関"), "👟"),
+    (("はみがき", "歯みがき", "歯磨き", "はブラシ", "歯ブラシ"), "🪥"),
+    (("おふろ", "お風呂", "ふろ", "風呂"), "🛁"),
+    (("トイレ", "べんき", "便器"), "🚽"),
+    (("ごみ", "ゴミ", "しげん", "資源"), "🗑️"),
+    (("しょっき", "食器", "おさら", "お皿", "皿"), "🍽️"),
+    (("はし", "箸", "スプーン", "カトラリー"), "🥢"),
+    (("ごはん", "ご飯", "しょくじ", "食事", "はいぜん", "配膳"), "🍚"),
+    (("せんたく", "洗濯", "ほす", "干す", "たたむ"), "🧺"),
+    (("服", "洋服", "きがえ", "着替え", "パジャマ"), "👕"),
+    (("テーブル", "つくえ", "机"), "🧽"),
+    (("まど", "窓", "ガラス"), "🪟"),
+    (("そうじき", "掃除機", "ゆか", "床"), "🧹"),
+    (("そうじ", "掃除", "はく", "ほうき"), "🧹"),
+    (("ふとん", "布団", "ベッド", "まくら", "枕"), "🛏️"),
+    (("ランドセル", "かばん", "カバン", "がっこう", "学校", "しゅくだい", "宿題"), "🎒"),
+    (("ほん", "本", "えほん", "絵本", "としょ", "図書"), "📚"),
+    (("おもちゃ", "かたづけ", "片付け", "せいり", "整理"), "🧸"),
+    (("みずやり", "水やり", "はな", "花", "しょくぶつ", "植物", "にわ", "庭"), "🪴"),
+    (("いぬ", "犬", "ねこ", "猫", "ペット", "えさ", "エサ"), "🐾"),
+    (("あらい", "洗い", "ふく", "拭く", "みがく", "磨く"), "🧽"),
+]
+
+# どの語にも当てはまらなかったときに使うアイコン
+FALLBACK_ICONS = ["🧹", "👕", "🧺", "🍽️", "🥢", "🗑️", "🧴", "🧽", "📚", "🪥"]
+
+
+def stable_index(text, length):
+    """文字列から決まる安定したインデックスを返す
+
+    Pythonの組み込み hash() は実行ごとに変わる（PYTHONHASHSEED）ため使えない。
+    SHA-256 を使うのは暗号目的ではなく、実行をまたいで同じ値を得るためだけ。
+    """
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return int(digest, 16) % length
+
+
+def pick_icon(name):
+    """タスク名の内容に合ったアイコンを選ぶ"""
+    for keywords, icon in ICON_RULES:
+        if any(k in name for k in keywords):
+            return icon
+    return FALLBACK_ICONS[stable_index(name, len(FALLBACK_ICONS))]
+
+
+def pick_colors(names):
+    """各タスクの色を決める
+
+    色はタスク名から決まるので、タスクを追加・並べ替えしても他のタスクの色は変わらない。
+    ただし同じ色が上下に隣り合うと見づらいため、その場合だけ次の色にずらす。
+    """
+    result = []
+    previous = None
+    for name in names:
+        color = POSTER_COLORS[stable_index(name, len(POSTER_COLORS))]
+        if color == previous:
+            color = POSTER_COLORS[(POSTER_COLORS.index(color) + 1) % len(POSTER_COLORS)]
+        result.append(color)
+        previous = color
+    return result
+
+
+# ============================================================
 # HTML テンプレート（基本タスクポスター：A4縦）
 # ============================================================
 def build_basic_poster_html(basic_tasks, prov):
-    colors =["c1", "c2", "c3", "c4", "c5", "c6"]
-    icons = ["🧹", "👕", "🧺", "🍽️", "🥢", "🗑️", "🧴", "🧽", "📚", "🪥"]
+    card_colors = pick_colors([t["name"] for t in basic_tasks])
 
     def task_card(t, i):
-        color = colors[i % len(colors)]
-        icon = icons[i % len(icons)]
+        color = card_colors[i]
+        icon = pick_icon(t["name"])
         note_html = f'<div class="task-note">{esc(t["note"])}</div>' if t["note"] else ""
         return f"""
     <div class="task-card {color}">

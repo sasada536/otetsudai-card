@@ -94,7 +94,9 @@ URLはブックマークしておくと毎回探さなくて済みます。
 - レイアウト自体（列数やデザイン）を変えたいときはこれまで通りClaudeに相談してOK。
   その場合は `generate.py` 内のHTMLテンプレート部分を書き換える
 - 「かならずもらえる」金額は `generate.py` の `FIXED_ALLOWANCE`（初期値500円）で変更する
-- 生成されるファイルの詳しい仕様は [`docs/SPEC.md`](docs/SPEC.md) を参照
+- 詳しい仕様・手順書は [`docs/okf/`](docs/okf/index.md) を参照
+  （[OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+  形式のナレッジバンドル。人間も AI エージェントもそのまま読める）
 
 ---
 
