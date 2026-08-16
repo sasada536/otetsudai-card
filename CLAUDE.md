@@ -15,6 +15,47 @@ tool output. Do not answer in English.
 例外は、リポジトリに書き込む成果物そのもの（コミットメッセージ、PR タイトル／本文、
 コード内のコメント）のうち、既存の慣習が英語であるもののみ。チャットでの説明は常に日本語。
 
+## 公開リポジトリの原則（最優先ルール / TOP PRIORITY）
+
+**このリポジトリは GitHub 上で公開運用している。コミット・プッシュする内容はすべて、
+全世界から永続的に閲覧できる前提で扱うこと。** git の履歴は後から消しにくいため、
+「入れてしまってから消す」ではなく「最初から入れない」で守る。
+
+This repository is public. Everything committed is world-readable and effectively permanent.
+Never commit personal information or anything security-sensitive.
+
+### 絶対にコミットしてはいけないもの
+
+- `NOTION_TOKEN`、API キー、各種シークレット（GitHub Actions Secrets 経由でのみ渡す）
+- `NOTION_DATABASE_ID`（データベースを特定できる識別子。生成物にも埋め込まない）
+- 実在の家族の氏名・学校名・住所・写真・生活パターンが推測できる情報
+- `output/` の生成物（実データを含むため。`.gitignore` 済み）
+- 上記が写り込んだスクリーンショットやログの貼り付け
+
+### 守るべきこと
+
+- サンプルデータ（`data/sample_tasks.json`）は**架空の内容のみ**。実在のタスクをコピーしない
+- 新しい出力項目・新しいファイルを追加するときは、**公開して問題ないかを必ず確認してから**追加する
+- 迷ったら入れない。判断がつかない場合はユーザーに確認する
+- 公開前チェック `scripts/check_public_output.py` を弱めたり、迂回したりしない
+
+なお、コミットのメタデータ（author の氏名・メールアドレス）も公開される。これは GitHub
+アカウントの設定に属するため本リポジトリの管理外だが、変更したい場合は GitHub の
+noreply アドレス設定を使う。
+
+## Knowledge bundle: docs/okf/
+
+Detailed specifications, playbooks, and design rationale live in `docs/okf/`, an
+[OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+bundle — one concept per Markdown file, `type` in YAML frontmatter, interlinked with relative
+links. Start at `docs/okf/index.md`. **Read the relevant concept file before changing the thing
+it describes**, and update it in the same commit when behavior changes.
+
+When adding a concept file: give it a non-empty `type` (that is the only required field), plus
+`title` / `description` / `tags`. Reserved names `index.md` and `log.md` carry no frontmatter —
+the sole exception is the bundle-root `index.md`, which holds `okf_version`. Record notable
+changes in `docs/okf/log.md`.
+
 ## What this is
 
 A single-script static site generator: it reads a Notion database (「おてつだいタスク一覧」 — a kids' chore list) and emits three self-contained print-oriented HTML files into `output/`, which GitHub Actions publishes to GitHub Pages. The whole project is `generate.py` plus one workflow; there are no dependencies (stdlib `urllib` only), no build step, no tests, and no package manifest.
