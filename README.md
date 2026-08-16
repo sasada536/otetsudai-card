@@ -7,6 +7,19 @@ Notionの「おてつだいタスク一覧」DBから、印刷用HTML（スタ�
 
 ---
 
+## 動作をすぐ試したい場合（Notionの設定なし）
+
+サンプルデータが同梱されているので、Notionのアカウントやトークンがなくても動かせます。
+
+```bash
+python generate.py --sample
+```
+
+`output/` に3つのHTMLと `tasks.json` が生成されるので、`output/index.html` をブラウザで開いてください。
+必要なのはPython 3.11以降だけで、`pip install` は不要です（標準ライブラリのみを使用）。
+
+---
+
 ## セットアップ手順（最初の1回だけ）
 
 ### ① Notion Integration（APIキー）を作る
@@ -80,3 +93,35 @@ URLはブックマークしておくと毎回探さなくて済みます。
 - タスクの追加・削除・単価変更はすべてNotion側の編集だけで反映される
 - レイアウト自体（列数やデザイン）を変えたいときはこれまで通りClaudeに相談してOK。
   その場合は `generate.py` 内のHTMLテンプレート部分を書き換える
+- 「かならずもらえる」金額は `generate.py` の `FIXED_ALLOWANCE`（初期値500円）で変更する
+- 生成されるファイルの詳しい仕様は [`docs/SPEC.md`](docs/SPEC.md) を参照
+
+---
+
+## 出力されるファイル
+
+| ファイル | 内容 |
+| --- | --- |
+| `index.html` | 印刷ページへのリンク集 |
+| `stamp_print.html` | チャレンジタスクのスタンプカード（A4横・2部） |
+| `basic_tasks_poster.html` | 基本タスクのポスター（A4縦） |
+| `tasks.json` | タスクデータ（機械可読・再利用向け） |
+
+---
+
+## 公開範囲とライセンス
+
+このリポジトリで**オープンにしているのはツールと生成物であって、入力データではありません**。
+
+- Notionのデータベース（各家庭のタスク内容）は非公開で、閲覧にはトークンが必要です
+- GitHub Pages に公開されるのは、生成されたHTMLと `tasks.json` だけです
+- 動作確認用の `data/sample_tasks.json` は実在の家庭のデータではなく、すべて架空の内容です
+
+ライセンスは用途ごとに分かれています。
+
+| 対象 | ライセンス |
+| --- | --- |
+| コード（`generate.py`、ワークフロー等） | [MIT License](LICENSE) |
+| ドキュメント（`README.md`、`docs/`） | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja) |
+
+生成されたHTML・JSONの著作権は、それを生成した人（＝入力データの持ち主）に帰属します。
