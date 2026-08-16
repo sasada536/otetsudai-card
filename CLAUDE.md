@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 応答言語（最優先ルール / TOP PRIORITY）
+
+**このリポジトリでの応答・解説・要約・質問はすべて日本語で書くこと。**
+ユーザーが英語で書いてきた場合や、コード・ログ・エラーメッセージが英語の場合でも、
+Claude の地の文（説明部分）は必ず日本語にする。英語で返答してはならない。
+
+Always respond in Japanese in this repository — every explanation, summary, plan, and
+question. This applies regardless of the language of the user's message, the code, or any
+tool output. Do not answer in English.
+
+例外は、リポジトリに書き込む成果物そのもの（コミットメッセージ、PR タイトル／本文、
+コード内のコメント）のうち、既存の慣習が英語であるもののみ。チャットでの説明は常に日本語。
+
 ## What this is
 
 A single-script static site generator: it reads a Notion database (「おてつだいタスク一覧」 — a kids' chore list) and emits three self-contained print-oriented HTML files into `output/`, which GitHub Actions publishes to GitHub Pages. The whole project is `generate.py` plus one workflow; there are no dependencies (stdlib `urllib` only), no build step, no tests, and no package manifest.
