@@ -2,22 +2,119 @@
 Notionの「おてつだいタスク一覧」DBを読み込んで、
 印刷用スタンプカードHTML（stamp_print.html）と
 基本タスクポスター（basic_tasks_poster.html）を自動生成するスクリプト。
+あわせて、機械可読なタスクデータ（tasks.json）も出力する。
 
 必要な環境変数:
   NOTION_TOKEN        Notion Internal Integration Secret
   NOTION_DATABASE_ID  「おてつだいタスク一覧」データベースのID
+
+Notionの認証情報がなくても、サンプルデータで動作を再現できる:
+  python generate.py --sample
 """
 
 import os
 import sys
 import json
+import html
+import hashlib
+import datetime
+import subprocess
 import urllib.request
+import urllib.error
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 NOTION_VERSION = "2022-06-28"
 
 OUTPUT_DIR = "output"
+SAMPLE_DATA_PATH = os.path.join("data", "sample_tasks.json")
+
+# スタンプカードの「かならずもらえる」固定額（円）。Notionからは変更できない。
+FIXED_ALLOWANCE = 500
+
+# 用紙に収まる目安の件数。超えたら警告を出すだけで、生成自体は続行する。
+BASIC_TASK_LIMIT = 8
+CHALLENGE_TASK_LIMIT = 14
+
+JST = datetime.timezone(datetime.timedelta(hours=9))
+
+
+def esc(value):
+    """Notion由来の文字列をHTMLに安全に埋め込める形へエスケープする"""
+    return html.escape(str(value), quote=True)
+
+
+def get_commit_sha():
+    """生成物の来歴用に、元になったコミットのSHAを求める（取れなければ空文字）"""
+    sha = os.environ.get("GITHUB_SHA", "")
+    if sha:
+        return sha[:7]
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if out.returncode == 0:
+            return out.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
+def build_provenance(source):
+    """いつ・何から生成したかを示すメタデータを組み立てる"""
+    now = datetime.datetime.now(JST)
+    return {
+        "generated_at": now.isoformat(timespec="seconds"),
+        "generated_at_label": now.strftime("%Y年%m月%d日 %H:%M"),
+        "source": source,
+        "commit": get_commit_sha(),
+    }
+
+
+def provenance_meta(prov):
+    """全HTMLに共通で埋め込む来歴メタタグ（レイアウトには影響しない）"""
+    commit = f' (commit {esc(prov["commit"])})' if prov["commit"] else ""
+    return (
+        f'<meta name="generator" content="otetsudai-card">\n'
+        f'<meta name="date" content="{esc(prov["generated_at"])}">\n'
+        f'<meta name="source" content="{esc(prov["source"])}{commit}">'
+    )
+
+
+def provenance_note(prov):
+    """画面表示時にだけ見える生成日時の注記（印刷時は非表示）"""
+    label = "サンプルデータ" if prov["source"] == "sample" else "Notionのデータ"
+    commit = f" / {esc(prov['commit'])}" if prov["commit"] else ""
+    return f'{label}から自動生成されました（{esc(prov["generated_at_label"])}{commit}）'
+
+
+HTTP_ERROR_HINTS = {
+    401: "NOTION_TOKEN が無効か、期限切れです。インテグレーションのシークレットを確認してください。",
+    403: "このトークンにはデータベースを読む権限がありません。",
+    404: "データベースが見つかりません。NOTION_DATABASE_ID が正しいか、\n"
+    "  Notion側でデータベースにインテグレーションを「コネクト」済みかを確認してください。",
+    429: "Notion APIのレート制限に達しました。しばらく待ってから再実行してください。",
+}
+
+
+def fail_with_api_error(e):
+    """Notion APIのHTTPエラーを、原因が分かる形に整えて終了する"""
+    body = e.read().decode("utf-8", errors="replace")
+    try:
+        message = json.loads(body).get("message", body)
+    except json.JSONDecodeError:
+        message = body
+
+    print(f"エラー: Notion APIがHTTP {e.code} を返しました", file=sys.stderr)
+    hint = HTTP_ERROR_HINTS.get(e.code)
+    if hint:
+        print(f"  {hint}", file=sys.stderr)
+    if message:
+        print(f"  APIからの応答: {message}", file=sys.stderr)
+    sys.exit(1)
 
 
 def notion_query_database(database_id):
@@ -36,8 +133,18 @@ def notion_query_database(database_id):
             },
             method="POST",
         )
-        with urllib.request.urlopen(req) as res:
-            data = json.loads(res.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(req) as res:
+                data = json.loads(res.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            fail_with_api_error(e)
+        except urllib.error.URLError as e:
+            print(
+                f"エラー: Notion APIに接続できませんでした（{e.reason}）\n"
+                "  ネットワーク接続を確認してください。",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         results.extend(data.get("results", []))
         if data.get("has_more"):
             payload["start_cursor"] = data["next_cursor"]
@@ -73,6 +180,44 @@ def get_prop_number(props, name):
     return prop.get("number") or 0
 
 
+def load_sample_tasks():
+    """Notionの認証情報がないときに使う、リポジトリ同梱のサンプルデータを読む"""
+    if not os.path.exists(SAMPLE_DATA_PATH):
+        print(f"エラー: サンプルデータが見つかりません: {SAMPLE_DATA_PATH}", file=sys.stderr)
+        sys.exit(1)
+    with open(SAMPLE_DATA_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("basic_tasks", []), data.get("challenge_tasks", [])
+
+
+def warn_on_task_counts(basic_tasks, challenge_tasks):
+    """出力が壊れそうな件数のときに警告する（生成自体は続行する）"""
+    if not basic_tasks and not challenge_tasks:
+        print(
+            "警告: タスクが1件も取得できませんでした。\n"
+            "  Notion側のプロパティ名（タスク名／タイプ）や、タイプの選択肢名\n"
+            "  （基本／チャレンジ）が変更されていないか確認してください。",
+            file=sys.stderr,
+        )
+    elif not basic_tasks:
+        print("警告: 基本タスクが0件です。ポスターが空になります。", file=sys.stderr)
+    elif not challenge_tasks:
+        print("警告: チャレンジタスクが0件です。スタンプカードが空になります。", file=sys.stderr)
+
+    if len(basic_tasks) > BASIC_TASK_LIMIT:
+        print(
+            f"警告: 基本タスクが{len(basic_tasks)}件あります"
+            f"（A4縦に収まる目安は{BASIC_TASK_LIMIT}件）。印刷プレビューで確認してください。",
+            file=sys.stderr,
+        )
+    if len(challenge_tasks) > CHALLENGE_TASK_LIMIT:
+        print(
+            f"警告: チャレンジタスクが{len(challenge_tasks)}件あります"
+            f"（A4横に収まる目安は{CHALLENGE_TASK_LIMIT}件）。印刷プレビューで確認してください。",
+            file=sys.stderr,
+        )
+
+
 def load_tasks():
     pages = notion_query_database(NOTION_DATABASE_ID)
     basic_tasks = []
@@ -101,20 +246,20 @@ def load_tasks():
 # ============================================================
 # HTML テンプレート（印刷用スタンプカード：チャレンジタスク）
 # ============================================================
-def build_stamp_print_html(challenge_tasks):
+def build_stamp_print_html(challenge_tasks, prov):
     dates = list(range(1, 32))
     free_rows = 3
 
     def task_row(t):
-        note_html = f'<div class="task-note">{t["note"]}</div>' if t["note"] else ""
+        note_html = f'<div class="task-note">{esc(t["note"])}</div>' if t["note"] else ""
         date_cells = "".join('<td class="td-date"></td>' for _ in dates)
         return f"""
     <tr>
       <td class="td-task">
-        <div class="task-name">{t['name']}</div>
+        <div class="task-name">{esc(t['name'])}</div>
         {note_html}
       </td>
-      <td class="td-star">{t['star']}</td>
+      <td class="td-star">{esc(t['star'])}</td>
       <td class="td-price">{t['price']}<span style="font-size:5pt;">円</span></td>
       {date_cells}
       <td class="td-count">　かい</td>
@@ -136,7 +281,7 @@ def build_stamp_print_html(challenge_tasks):
     def calc_row(t):
         return f"""
       <div class="calc-row">
-        <span class="c-name">{t['name']}</span>
+        <span class="c-name">{esc(t['name'])}</span>
         <span class="c-price">{t['price']}円</span>
         <span class="c-x">×</span>
         <span class="c-box"></span>
@@ -217,7 +362,7 @@ def build_stamp_print_html(challenge_tasks):
           <div class="calc-right">
             <div class="cr-row">
               <span class="cr-label">🔒 かならずもらえる</span>
-              <span class="cr-fixed">500円</span>
+              <span class="cr-fixed">{FIXED_ALLOWANCE}円</span>
             </div>
             <div class="cr-row">
               <span class="cr-label">⭐ おてつだい合計</span>
@@ -245,6 +390,7 @@ def build_stamp_print_html(challenge_tasks):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>おてつだいスタンプカード（印刷用）</title>
+{provenance_meta(prov)}
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -358,7 +504,7 @@ def build_stamp_print_html(challenge_tasks):
 <body>
 <div class="print-controls">
   <button class="print-btn" onclick="window.print()">🖨️ 印刷する（A4・横向き）</button>
-  <p class="screen-note">Notionのデータから自動生成されました</p>
+  <p class="screen-note">{provenance_note(prov)}</p>
 </div>
 <div id="sheets">{sheets_html}</div>
 </body>
@@ -366,21 +512,91 @@ def build_stamp_print_html(challenge_tasks):
 
 
 # ============================================================
+# ポスターの色とアイコン（タスク名から決まる。並び順には依存しない）
+# ============================================================
+POSTER_COLORS = ["c1", "c2", "c3", "c4", "c5", "c6"]
+
+# タスク名に含まれる語からアイコンを選ぶ。上から順に判定し、最初に一致したものを使う。
+# 「テーブルをふく」と「服」のようにかなが重なる語があるため、具体的な語を先に置くこと。
+ICON_RULES = [
+    (("くつした", "靴下", "くつ下"), "🧦"),
+    (("くつ", "靴", "げんかん", "玄関"), "👟"),
+    (("はみがき", "歯みがき", "歯磨き", "はブラシ", "歯ブラシ"), "🪥"),
+    (("おふろ", "お風呂", "ふろ", "風呂"), "🛁"),
+    (("トイレ", "べんき", "便器"), "🚽"),
+    (("ごみ", "ゴミ", "しげん", "資源"), "🗑️"),
+    (("しょっき", "食器", "おさら", "お皿", "皿"), "🍽️"),
+    (("はし", "箸", "スプーン", "カトラリー"), "🥢"),
+    (("ごはん", "ご飯", "しょくじ", "食事", "はいぜん", "配膳"), "🍚"),
+    (("せんたく", "洗濯", "ほす", "干す", "たたむ"), "🧺"),
+    (("服", "洋服", "きがえ", "着替え", "パジャマ"), "👕"),
+    (("テーブル", "つくえ", "机"), "🧽"),
+    (("まど", "窓", "ガラス"), "🪟"),
+    (("そうじき", "掃除機", "ゆか", "床"), "🧹"),
+    (("そうじ", "掃除", "はく", "ほうき"), "🧹"),
+    (("ふとん", "布団", "ベッド", "まくら", "枕"), "🛏️"),
+    (("ランドセル", "かばん", "カバン", "がっこう", "学校", "しゅくだい", "宿題"), "🎒"),
+    (("ほん", "本", "えほん", "絵本", "としょ", "図書"), "📚"),
+    (("おもちゃ", "かたづけ", "片付け", "せいり", "整理"), "🧸"),
+    (("みずやり", "水やり", "はな", "花", "しょくぶつ", "植物", "にわ", "庭"), "🪴"),
+    (("いぬ", "犬", "ねこ", "猫", "ペット", "えさ", "エサ"), "🐾"),
+    (("あらい", "洗い", "ふく", "拭く", "みがく", "磨く"), "🧽"),
+]
+
+# どの語にも当てはまらなかったときに使うアイコン
+FALLBACK_ICONS = ["🧹", "👕", "🧺", "🍽️", "🥢", "🗑️", "🧴", "🧽", "📚", "🪥"]
+
+
+def stable_index(text, length):
+    """文字列から決まる安定したインデックスを返す
+
+    Pythonの組み込み hash() は実行ごとに変わる（PYTHONHASHSEED）ため使えない。
+    SHA-256 を使うのは暗号目的ではなく、実行をまたいで同じ値を得るためだけ。
+    """
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return int(digest, 16) % length
+
+
+def pick_icon(name):
+    """タスク名の内容に合ったアイコンを選ぶ"""
+    for keywords, icon in ICON_RULES:
+        if any(k in name for k in keywords):
+            return icon
+    return FALLBACK_ICONS[stable_index(name, len(FALLBACK_ICONS))]
+
+
+def pick_colors(names):
+    """各タスクの色を決める
+
+    色はタスク名から決まるので、タスクを追加・並べ替えしても他のタスクの色は変わらない。
+    ただし同じ色が上下に隣り合うと見づらいため、その場合だけ次の色にずらす。
+    """
+    result = []
+    previous = None
+    for name in names:
+        color = POSTER_COLORS[stable_index(name, len(POSTER_COLORS))]
+        if color == previous:
+            color = POSTER_COLORS[(POSTER_COLORS.index(color) + 1) % len(POSTER_COLORS)]
+        result.append(color)
+        previous = color
+    return result
+
+
+# ============================================================
 # HTML テンプレート（基本タスクポスター：A4縦）
 # ============================================================
-def build_basic_poster_html(basic_tasks):
-    colors = ["c1", "c2", "c3", "c4", "c5", "c6"]
-    icons = ["🧹", "👕", "🧺", "🍽️", "🥢", "🗑️", "🧴", "🧽", "📚", "🪥"]
+def build_basic_poster_html(basic_tasks, prov):
+    card_colors = pick_colors([t["name"] for t in basic_tasks])
 
     def task_card(t, i):
-        color = colors[i % len(colors)]
-        icon = icons[i % len(icons)]
-        note_html = f'<div class="task-note">{t["note"]}</div>' if t["note"] else ""
+        color = card_colors[i]
+        icon = pick_icon(t["name"])
+        note_html = f'<div class="task-note">{esc(t["note"])}</div>' if t["note"] else ""
         return f"""
     <div class="task-card {color}">
       <div class="task-icon">{icon}</div>
       <div class="task-body">
-        <div class="task-name">{t['name']}</div>
+        <div class="task-name">{esc(t['name'])}</div>
         {note_html}
       </div>
     </div>"""
@@ -393,6 +609,7 @@ def build_basic_poster_html(basic_tasks):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>きほんおてつだいリスト</title>
+{provenance_meta(prov)}
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -444,7 +661,7 @@ def build_basic_poster_html(basic_tasks):
 <body>
 <div class="print-controls">
   <button class="print-btn" onclick="window.print()">🖨️ 印刷する（A4・縦向き）</button>
-  <p class="screen-note">Notionのデータから自動生成されました</p>
+  <p class="screen-note">{provenance_note(prov)}</p>
 </div>
 <div class="poster">
   <div class="poster-header">
@@ -470,23 +687,58 @@ def build_basic_poster_html(basic_tasks):
 </html>"""
 
 
+def write_tasks_json(basic_tasks, challenge_tasks, prov):
+    """機械可読なタスクデータを書き出す（第三者が再利用できる形の出力）
+
+    NOTION_DATABASE_ID は公開ページに出さないため、意図的に含めない。
+    """
+    data = {
+        "generated_at": prov["generated_at"],
+        "source": prov["source"],
+        "commit": prov["commit"],
+        "counts": {"basic": len(basic_tasks), "challenge": len(challenge_tasks)},
+        "basic_tasks": basic_tasks,
+        "challenge_tasks": challenge_tasks,
+    }
+    with open(os.path.join(OUTPUT_DIR, "tasks.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
 def main():
-    if not NOTION_TOKEN or not NOTION_DATABASE_ID:
-        print("エラー: NOTION_TOKEN / NOTION_DATABASE_ID が設定されていません", file=sys.stderr)
+    use_sample = "--sample" in sys.argv[1:]
+
+    if not use_sample and (not NOTION_TOKEN or not NOTION_DATABASE_ID):
+        print(
+            "エラー: NOTION_TOKEN / NOTION_DATABASE_ID が設定されていません\n"
+            "  認証情報なしで動作を確認したい場合は --sample を付けて実行してください:\n"
+            "    python generate.py --sample",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    basic_tasks, challenge_tasks = load_tasks()
-    print(f"基本タスク: {len(basic_tasks)}件, チャレンジタスク: {len(challenge_tasks)}件")
+    if use_sample:
+        print(f"サンプルデータを使用します: {SAMPLE_DATA_PATH}")
+        basic_tasks, challenge_tasks = load_sample_tasks()
+    else:
+        basic_tasks, challenge_tasks = load_tasks()
 
-    stamp_html = build_stamp_print_html(challenge_tasks)
+    prov = build_provenance("sample" if use_sample else "notion")
+
+    print(f"基本タスク: {len(basic_tasks)}件, チャレンジタスク: {len(challenge_tasks)}件")
+    warn_on_task_counts(basic_tasks, challenge_tasks)
+
+    stamp_html = build_stamp_print_html(challenge_tasks, prov)
     with open(os.path.join(OUTPUT_DIR, "stamp_print.html"), "w", encoding="utf-8") as f:
         f.write(stamp_html)
 
-    poster_html = build_basic_poster_html(basic_tasks)
+    poster_html = build_basic_poster_html(basic_tasks, prov)
     with open(os.path.join(OUTPUT_DIR, "basic_tasks_poster.html"), "w", encoding="utf-8") as f:
         f.write(poster_html)
+
+    write_tasks_json(basic_tasks, challenge_tasks, prov)
 
     # シンプルな index.html（iPhoneから開いたときのリンク集）
     index_html = f"""<!DOCTYPE html>
@@ -495,6 +747,7 @@ def main():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>おてつだい制度</title>
+{provenance_meta(prov)}
 <style>
   body {{ font-family: sans-serif; background:#f5f5f0; padding:40px 20px; text-align:center; }}
   h1 {{ font-size: 20px; margin-bottom: 24px; }}
@@ -502,6 +755,7 @@ def main():
     display:block; max-width:320px; margin:0 auto 16px; padding:16px;
     background:#1c1c1e; color:#fff; text-decoration:none; border-radius:12px; font-weight:bold;
   }}
+  a.data {{ background:#fff; color:#555; border:1.5px solid #ddd; font-weight:normal; font-size:14px; }}
   p.updated {{ color:#999; font-size:12px; margin-top:24px; }}
 </style>
 </head>
@@ -509,13 +763,17 @@ def main():
   <h1>⭐ おてつだい制度 印刷ページ</h1>
   <a href="stamp_print.html">📋 チャレンジタスク スタンプカード（A4横）</a>
   <a href="basic_tasks_poster.html">🏠 きほんタスク ポスター（A4縦）</a>
-  <p class="updated">Notionのデータから自動生成されています</p>
+  <a href="tasks.json" class="data">📄 タスクデータ（JSON）</a>
+  <p class="updated">{provenance_note(prov)}</p>
 </body>
 </html>"""
     with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(index_html)
 
-    print("生成完了: output/index.html, stamp_print.html, basic_tasks_poster.html")
+    print(
+        "生成完了: output/index.html, stamp_print.html, "
+        "basic_tasks_poster.html, tasks.json"
+    )
 
 
 if __name__ == "__main__":

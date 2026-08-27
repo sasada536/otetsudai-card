@@ -34,6 +34,13 @@ jobs:
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: python generate.py
 
+      # 公開リポジトリなので、Pagesに上げる前に秘密情報の混入を検査する
+      - name: Check output for secrets
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: python scripts/check_public_output.py
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

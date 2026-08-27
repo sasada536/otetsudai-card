@@ -1,0 +1,6 @@
+# 生成物（毎回作り直されるのでコミットしない）
+output/
+
+# Python
+__pycache__/
+*.py[cod]
