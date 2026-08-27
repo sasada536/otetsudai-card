@@ -34,7 +34,7 @@ FIXED_ALLOWANCE = 500
 
 # 用紙に収まる目安の件数。超えたら警告を出すだけで、生成自体は続行する。
 BASIC_TASK_LIMIT = 8
-CHALLENGE_TASK_LIMIT = 14
+CHALLENGE_TASK_LIMIT = 12
 
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
@@ -485,19 +485,24 @@ def build_stamp_print_html(challenge_tasks, prov):
     display: flex; flex-direction: column; gap: 2.5mm; justify-content: center;
   }}
   .cr-row {{ display: flex; justify-content: space-between; align-items: flex-end; font-size: 7.5pt; }}
-  .cr-label {{ color: #555; }}
+  .cr-label {{ color: #555; white-space: nowrap; }}
   .cr-fixed {{ font-weight: 700; color: #1c1c1e; }}
-  .cr-line {{ width: 16mm; border-bottom: 1px solid #666; height: 4mm; }}
+  .cr-line {{ width: 13mm; border-bottom: 1px solid #666; height: 4mm; }}
   .cr-yen {{ font-size: 6.5pt; color: #555; margin-left: 1mm; }}
   .cr-divider {{ border: none; border-top: 1.5px solid #333; }}
   .cr-total {{ display: flex; justify-content: space-between; align-items: flex-end; font-size: 10pt; font-weight: 900; }}
   .cr-total-line {{ width: 18mm; border-bottom: 2px solid #333; height: 5mm; }}
   @media print {{
-    @page {{ size: A4 landscape; margin: 0; }}
+    @page {{ size: A4 landscape; margin: 5mm 0 0; }}
     body {{ background: none; padding: 0; gap: 0; }}
     .print-controls {{ display: none !important; }}
-    .sheet {{ box-shadow: none; width: 100%; padding: 7mm 8mm 6mm; page-break-after: always; }}
+    .sheet {{ box-shadow: none; width: 100%; padding: 2mm 8mm 6mm; page-break-after: always; }}
     .sheet:last-child {{ page-break-after: avoid; }}
+    /* タスクが多くて1枚に収まらないときは、計算欄を丸ごと次のページへ送る。
+       収まる場合は改ページしないので、少ない件数なら従来どおり1枚に収まる。 */
+    .calc-section {{ page-break-inside: avoid; break-inside: avoid; }}
+    .main-table tr {{ page-break-inside: avoid; }}
+    .main-table thead {{ display: table-header-group; }}
   }}
 </style>
 </head>

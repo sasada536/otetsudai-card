@@ -69,7 +69,7 @@ HTTP エラーは `fail_with_api_error()` が受け取り、原因の見当が�
 | 両方 0 件 | プロパティ名・選択肢名の変更を疑うよう促す |
 | 片方だけ 0 件 | 該当の紙が空になる旨 |
 | 基本 > `BASIC_TASK_LIMIT`（8） | A4 縦に収まらない可能性 |
-| チャレンジ > `CHALLENGE_TASK_LIMIT`（14） | A4 横に収まらない可能性 |
+| チャレンジ > `CHALLENGE_TASK_LIMIT`（12） | 計算欄が 2 ページ目に送られる |
 
 ### 来歴
 
@@ -113,5 +113,5 @@ Notion 由来の文字列は、埋め込む直前に必ず `esc()` を通す
 | --- | --- | --- |
 | `FIXED_ALLOWANCE` | `500` | スタンプカードの「かならずもらえる」金額（円） |
 | `BASIC_TASK_LIMIT` | `8` | 基本タスクの警告しきい値 |
-| `CHALLENGE_TASK_LIMIT` | `14` | チャレンジタスクの警告しきい値 |
+| `CHALLENGE_TASK_LIMIT` | `12` | チャレンジタスクの警告しきい値（実測値） |
 | `SAMPLE_DATA_PATH` | `data/sample_tasks.json` | サンプルデータの場所 |
