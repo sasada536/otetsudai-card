@@ -250,6 +250,13 @@ def build_stamp_print_html(challenge_tasks, prov):
     dates = list(range(1, 32))
     free_rows = 3
 
+    # 1枚に収まらない件数なら、計算セクションを明示的に次のページへ送る。
+    # 「収まるかどうか」の判断をブラウザに任せると印刷エンジンごとに結果が変わるため
+    # （iPhoneのSafariとPCのChromeで挙動が異なる）、件数から機械的に決める。
+    calc_class = "calc-section"
+    if len(challenge_tasks) > CHALLENGE_TASK_LIMIT:
+        calc_class += " force-new-page"
+
     def task_row(t):
         note_html = f'<div class="task-note">{esc(t["note"])}</div>' if t["note"] else ""
         date_cells = "".join('<td class="td-date"></td>' for _ in dates)
@@ -355,7 +362,7 @@ def build_stamp_print_html(challenge_tasks, prov):
         </tbody>
       </table>
 
-      <div class="calc-section">
+      <div class="{calc_class}">
         <div class="calc-title">💰 今月のおこづかい計算（かい数 × 1かいのきんがく = ごうけい）</div>
         <div class="calc-body">
           <div class="calc-tasks">{calc_rows_html}</div>
@@ -500,6 +507,7 @@ def build_stamp_print_html(challenge_tasks, prov):
     .sheet:last-child {{ page-break-after: avoid; }}
     /* タスクが多くて1枚に収まらないときは、計算欄を丸ごと次のページへ送る。
        収まる場合は改ページしないので、少ない件数なら従来どおり1枚に収まる。 */
+    .calc-section.force-new-page {{ page-break-before: always; break-before: page; }}
     .calc-section {{ page-break-inside: avoid; break-inside: avoid; }}
     .main-table tr {{ page-break-inside: avoid; }}
     .main-table thead {{ display: table-header-group; }}
