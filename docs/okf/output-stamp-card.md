@@ -58,7 +58,16 @@ generated:
 ## ページ数と改ページ
 
 タスクが少なければ 1 部 = 1 ページ。**多くて収まらない場合は、計算セクションだけが
-次のページへ送られる**（`.calc-section` に `page-break-inside: avoid` を指定しているため）。
+次のページへ送られる。**
+
+改ページするかどうかは **Python 側が件数から決める**。`CHALLENGE_TASK_LIMIT` を超える場合、
+計算セクションに `force-new-page` クラスが付き、`page-break-before: always` で明示的に
+次ページへ送られる。
+
+「収まるかどうか」の判断をブラウザに任せると印刷エンジンごとに結果が変わる
+（iPhone の Safari は WebKit、PC の Chrome は Blink）。**このプロジェクトは iPhone から
+印刷する運用のため、エンジンに依存しない形にしてある。**
+`page-break-inside: avoid` も残してあるが、こちらは保険。
 
 | チャレンジタスク | 1 部あたり | 印刷される総ページ数（2 部） |
 | --- | --- | --- |
@@ -67,6 +76,10 @@ generated:
 
 境目は 12 件と 13 件の間で、実測値である（A4 横の高さ 794px に対し、12 件で 771px）。
 `CHALLENGE_TASK_LIMIT` はこの実測に合わせて 12 に設定している。
+
+判定に使うのは**件数だけで、実際の高さではない**。そのため、12 件以下でもタスク名や
+備考が非常に長い場合は収まらないことがある。その場合 Chrome では
+`page-break-inside: avoid` が効いて自動的に送られるが、Safari では効かない可能性がある。
 
 表の途中で切れることはない（`tr` に `page-break-inside: avoid`）。表が複数ページに
 またがる場合は見出し行が繰り返される（`thead` に `display: table-header-group`）。
