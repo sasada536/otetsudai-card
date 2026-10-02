@@ -85,6 +85,15 @@ https://www.notion.so/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?v=...
 
 URLはブックマークしておくと毎回探さなくて済みます。
 
+### うまくいかないとき
+
+- **`deploy` だけ赤くなり、ログに `Failed to create deployment (status: 404)` と出る**
+  → 「Settings」→「Pages」の「Source」が **GitHub Actions** になっているか確認し、
+  なっていなければ直して「Run workflow」をやり直す（⑥の設定が外れている状態）。
+  すでに GitHub Actions になっている場合は、一度別の値に切り替えてから戻すと直ることがある
+- そのほかのエラーは [`docs/okf/playbooks/run-generation.md`](docs/okf/playbooks/run-generation.md)
+  の「失敗したとき」を参照
+
 ---
 
 ## 補足
