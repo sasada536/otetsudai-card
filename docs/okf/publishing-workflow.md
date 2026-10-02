@@ -17,8 +17,8 @@ generated:
 | 項目 | 内容 |
 | --- | --- |
 | ワークフロー名 | おてつだいカード生成 |
-| トリガー | `workflow_dispatch`（手動のみ） |
-| 定期実行 | 毎月 1 日 09:00 JST の cron が記述されているが**コメントアウトされており無効** |
+| トリガー | `workflow_dispatch`（手動）と `schedule`（定期実行） |
+| 定期実行 | 毎月 1 日 09:00 JST（cron `0 0 1 * *`、UTC 表記）。GitHub 側の混雑で遅れることがある |
 | ランナー | `ubuntu-latest` / Python 3.11 |
 | 権限 | `contents: read` / `pages: write` / `id-token: write` |
 | 同時実行制御 | `group: "pages"`、`cancel-in-progress: false` |
@@ -39,6 +39,15 @@ generated:
 
 使用する Action はすべて Node.js 24 ランタイムのメジャーバージョンにそろえている
 （Node.js 20 は GitHub Actions で非推奨）。上げるときはこの表記も合わせて更新する。
+
+## 定期実行が止まる条件
+
+GitHub は、公開リポジトリで **60 日間コミットなどの活動がない**と、定期実行のワークフローを
+自動で無効にする（事前にメールで通知が来る）。月 1 回の実行そのものは「活動」に数えられない
+ため、コードを触らない月が続くと 2〜3 か月後に止まる。
+
+止まったら Actions タブの「おてつだいカード生成」に出る「Enable workflow」を押せば再開する。
+定期実行の失敗・停止は GitHub からメールで届くので、それを見落とさないことが前提になる。
 
 ## Pages の公開元設定
 

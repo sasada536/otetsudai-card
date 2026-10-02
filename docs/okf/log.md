@@ -2,6 +2,9 @@
 
 ## 2026-10-02
 
+- 毎月 1 日 09:00 JST の定期実行を有効にした。60 日間活動がないと GitHub が定期実行を
+  止める点と再開方法を [公開ワークフロー](./publishing-workflow.md) と README に記載
+
 - [公開ワークフロー](./publishing-workflow.md) で使う Action を Node.js 24 対応版に更新
   （checkout v7 / setup-python v7 / upload-pages-artifact v5 / deploy-pages v5）。
   Node.js 20 非推奨の警告への対応

@@ -3,9 +3,10 @@ name: おてつだいカード生成
 on:
   # 手動実行ボタン（iPhoneのGitHubアプリからも実行できる）
   workflow_dispatch:
-  # 参考：毎月1日の朝9時（JST）に自動実行したい場合はコメントアウトを外す
-  # schedule:
-  #   - cron: "0 0 1 * *"
+  # 毎月1日の朝9時（JST）に自動実行。cron は UTC なので 0:00 UTC = 9:00 JST
+  # （GitHub 側の混雑で数十分遅れることがある）
+  schedule:
+    - cron: "0 0 1 * *"
 
 permissions:
   contents: read

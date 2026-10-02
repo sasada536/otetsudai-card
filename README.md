@@ -85,6 +85,12 @@ https://www.notion.so/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?v=...
 
 URLはブックマークしておくと毎回探さなくて済みます。
 
+毎月1日の朝9時ごろには自動でも実行されます。月初までにNotionの編集を済ませておけば、
+1日以降はURLを開いて印刷するだけです。
+
+GitHubの仕様で、60日間リポジトリに変更がないと自動実行が止まります（事前にメールが届きます）。
+止まったら「Actions」タブ →「おてつだいカード生成」に出る「Enable workflow」を押すと再開します。
+
 ### うまくいかないとき
 
 - **`deploy` だけ赤くなり、ログに `Failed to create deployment (status: 404)` と出る**

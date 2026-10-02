@@ -76,7 +76,7 @@ python generate.py --sample   # reads data/sample_tasks.json
 
 Sample mode is opt-in by design: missing credentials without `--sample` still exit 1, so a misconfigured CI run fails loudly instead of silently publishing sample data. The HTML builders are pure functions of the task lists plus a provenance dict, so they can also be called directly from a REPL.
 
-CI: `.github/workflows/generate.yml` runs the same command on Python 3.11 via `workflow_dispatch` (a monthly cron is present but commented out), then uploads `output/` as the Pages artifact and deploys. Secrets `NOTION_TOKEN` / `NOTION_DATABASE_ID` are configured at the repo level.
+CI: `.github/workflows/generate.yml` runs the same command on Python 3.11 via `workflow_dispatch` and a monthly cron (1st of each month, 09:00 JST), then uploads `output/` as the Pages artifact and deploys. Secrets `NOTION_TOKEN` / `NOTION_DATABASE_ID` are configured at the repo level.
 
 ## Architecture
 
