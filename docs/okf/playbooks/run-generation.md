@@ -35,7 +35,8 @@ generated:
 
 ## 失敗したとき
 
-ジョブのログを開き、エラーメッセージを確認する。
+ジョブのログを開き、エラーメッセージを確認する。build と deploy のどちらが赤いかも見る
+（build が緑で deploy だけ赤なら、カード自体は生成できている）。
 
 | メッセージ | 原因と対処 |
 | --- | --- |
@@ -44,6 +45,7 @@ generated:
 | `レート制限に達しました` | しばらく待って再実行する |
 | `公開前チェックに失敗しました` | 出力に秘密情報が混入している。[公開ポリシー](../publication-policy.md) を確認する |
 | `警告: タスクが1件も取得できませんでした` | [タスクが出てこないときの対応](./troubleshoot-missing-task.md) へ |
+| deploy ジョブが `Failed to create deployment (status: 404)` で失敗 | Settings → Pages の Source を「GitHub Actions」にして再実行する。詳細は [公開ワークフロー](../publishing-workflow.md#pages-の公開元設定) |
 
 ## 補足
 

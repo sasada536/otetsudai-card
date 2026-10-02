@@ -1,5 +1,14 @@
 # 更新履歴
 
+## 2026-10-02
+
+- [公開ワークフロー](./publishing-workflow.md) で使う Action を Node.js 24 対応版に更新
+  （checkout v7 / setup-python v7 / upload-pages-artifact v5 / deploy-pages v5）。
+  Node.js 20 非推奨の警告への対応
+- Pages の Source が「GitHub Actions」から外れて deploy が 404 で落ちた件を受け、
+  対処を [公開ワークフロー](./publishing-workflow.md)、
+  [カードを更新して印刷する](./playbooks/run-generation.md)、README に追記
+
 ## 2026-08-30
 
 - 実データ 14 件で、iPhone（Safari）と PC の両方で計算欄の改ページを確認。
