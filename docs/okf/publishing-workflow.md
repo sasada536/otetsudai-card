@@ -27,15 +27,31 @@ generated:
 
 **build**
 
-1. チェックアウト
-2. Python 3.11 セットアップ
+1. チェックアウト（`actions/checkout@v7`）
+2. Python 3.11 セットアップ（`actions/setup-python@v7`）
 3. `python generate.py`（Secrets を環境変数に注入）
 4. `python scripts/check_public_output.py` — **公開前の秘密情報チェック**
-5. `output/` を `actions/upload-pages-artifact@v3` でアップロード
+5. `output/` を `actions/upload-pages-artifact@v5` でアップロード
 
 **deploy**（`needs: build`）
 
-6. `actions/deploy-pages@v4` で GitHub Pages へ公開
+6. `actions/deploy-pages@v5` で GitHub Pages へ公開
+
+使用する Action はすべて Node.js 24 ランタイムのメジャーバージョンにそろえている
+（Node.js 20 は GitHub Actions で非推奨）。上げるときはこの表記も合わせて更新する。
+
+## Pages の公開元設定
+
+deploy ジョブは、リポジトリの Settings → Pages →「Build and deployment」の **Source が
+「GitHub Actions」** になっていることを前提にしている。「Deploy from a branch」になっていると
+build は成功するのに deploy だけが次のエラーで落ちる。
+
+```
+Failed to create deployment (status: 404) ... Ensure GitHub Pages has been enabled
+```
+
+対処は Source を「GitHub Actions」に戻して再実行するだけ。すでに「GitHub Actions」に
+なっている場合は、一度別の値に切り替えてから戻すと直ることがある。
 
 ## 公開前チェック
 
