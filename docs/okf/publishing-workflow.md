@@ -38,7 +38,12 @@ generated:
 6. `actions/deploy-pages@v5` で GitHub Pages へ公開
 
 使用する Action はすべて Node.js 24 ランタイムのメジャーバージョンにそろえている
-（Node.js 20 は GitHub Actions で非推奨）。上げるときはこの表記も合わせて更新する。
+（Node.js 20 は GitHub Actions で非推奨）。
+
+また、すべてコミット SHA で固定している（ワークフローのコメントに元のタグを併記）。
+タグは付け替えられるため、固定しておくと改ざんされた版が CI に紛れ込まない。
+上げるときは `git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag>` で
+SHA を調べて差し替え、この表記も合わせて更新する。
 
 ## Pages の公開元設定
 

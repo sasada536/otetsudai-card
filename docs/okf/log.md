@@ -1,5 +1,11 @@
 # 更新履歴
 
+## 2026-11-02
+
+- [公開ワークフロー](./publishing-workflow.md) の Action をタグ指定からコミット SHA 固定に変更
+  （サプライチェーン対策。コメントに元のタグを併記）。更新するときは
+  `git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag>` で SHA を調べて差し替える
+
 ## 2026-10-02
 
 - [公開ワークフロー](./publishing-workflow.md) で使う Action を Node.js 24 対応版に更新
